@@ -24,8 +24,6 @@ Running an LLM for one person is mostly a memory problem. Every token needs ever
 
 Groq keeps all the weights in SRAM on the chip, spread over many chips, and its compiler decides every cycle in advance. No caches, nothing scheduled at runtime.
 
-Cerebras makes a single chip out of a whole silicon wafer. That gives it tens of gigabytes of SRAM, enough to keep the weights right next to the cores.
-
 Taalas goes all the way and turns one model into one chip. The weights are built into the silicon itself, so there is nothing to load, and the chip can't run any other model.
 
 izfast sits between Groq and Taalas. Like Groq, the whole program is fixed before the chip runs and the weights live in SRAM next to the multipliers. Like Taalas, the chip is shaped around one model. The weights are not hard-wired though: each lane has an SRAM bank that gets filled when the chip starts, so it can load a fine-tuned Llama 3.2 1B or any model with the same shapes. Replacing those banks with ROM would give a smaller chip that runs one set of weights forever.
