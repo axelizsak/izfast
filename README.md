@@ -10,13 +10,13 @@ Demo: https://axelizsak.github.io/izfast/
 
 Cycles per token at the start of a conversation:
 
-| lanes | cycles per token | tokens/s at 7 nm (607 MHz) |
+| lanes | cycles per token | tokens/s at 7 nm (507 MHz) |
 |---|---|---|
-| 256 | 155,591 | 3,899 |
-| 1,024 | 42,839 | 14,160 |
-| 4,096 | 17,230 | 35,206 |
+| 256 | 155,591 | 3,259 |
+| 1,024 | 42,839 | 11,837 |
+| 4,096 | 17,230 | not timed yet |
 
-At 130 nm (SKY130) the clock drops to 81 MHz. Llama 3.2 1B running on the RTL gives exactly the same numbers, bit for bit, as the reference in `hw/ref.py` and the C emulator in `hw/emu.c` that the demo uses.
+507 MHz is the vector unit synthesized at the 1,024-lane width; the lanes alone reach 1.15 GHz. At 130 nm (SKY130) the small configuration runs at 81 MHz. Llama 3.2 1B running on the RTL gives exactly the same numbers, bit for bit, as the reference in `hw/ref.py` and the C emulator in `hw/emu.c` that the demo uses.
 
 ## Where the ideas come from
 
