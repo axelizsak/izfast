@@ -148,10 +148,11 @@ def cycle_tables():
 def clocks():
     out = {}
     for sta in sorted((BUILD / "synth").glob("*/sta.txt")):
-        top, lib = sta.parent.name.rsplit("_", 1)
+        top, lib, *tag = sta.parent.name.split("_")
+        unit = "_".join([top, *tag])
         m = re.search(r"FMAX_MHZ ([\d.]+)", sta.read_text())
-        if m and top in ("mvu", "vpu", "attn"):
-            out.setdefault(lib, {})[top] = float(m.group(1))
+        if m and re.fullmatch(r"mvu|(vpu|attn)(_vk\d+)?", unit):
+            out.setdefault(lib, {})[unit] = float(m.group(1))
     return out
 
 

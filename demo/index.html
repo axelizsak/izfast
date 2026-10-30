@@ -127,7 +127,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 const $ = id => document.getElementById(id);
 const S = { lanes: 1024, wbits: 4, node: "asap7" };
-const OPTS = { lanes: [256, 1024, 4096], wbits: [4, 8], node: ["sky130hd", "asap7"] };
+const OPTS = { lanes: [256, 1024], wbits: [4, 8], node: ["sky130hd", "asap7"] };
 const NODE = { sky130hd: "130 nm", asap7: "7 nm" };
 const UNIT = { mvu: "matrix unit", vpu: "vector unit", attn: "attention unit" };
 let info = null, job = null, runs = null, sel = -1, raf = 0, shown = false, burstUntil = 0;
@@ -150,10 +150,14 @@ const INFO = {
     "Drag to turn it, scroll to zoom, hover a block to see what it does. Not to scale: the weight memory takes most of the real area."],
 };
 
+function units(lanes = S.lanes, node = S.node) {
+  const c = info && info.clocks[node] || {}, t = info && info.cycles[lanes], vk = t ? t.vk : 1;
+  return Object.keys(UNIT).map(u => ({ u, f: c[`${u}_vk${vk}`] || c[u], small: vk > 1 && u !== "mvu" && !c[`${u}_vk${vk}`] }));
+}
+
 function timed() {
-  const c = info && info.clocks[S.node] || {};
-  const done = Object.keys(UNIT).filter(u => c[u]).map(u => `${UNIT[u]} ${Math.round(c[u]).toLocaleString("en-US")} MHz`);
-  const todo = Object.keys(UNIT).filter(u => !c[u]).map(u => UNIT[u]);
+  const k = units(), fmt = x => `${UNIT[x.u]} ${Math.round(x.f).toLocaleString("en-US")} MHz${x.small ? " (timed on a smaller version)" : ""}`;
+  const done = k.filter(x => x.f).map(fmt), todo = k.filter(x => !x.f).map(x => UNIT[x.u]);
   return `Measured at ${NODE[S.node]}: ${done.join(", ") || "nothing yet"}.` + (todo.length ? ` Not timed yet: ${todo.join(", ")}.` : " The chip runs at the slowest one.");
 }
 
@@ -177,7 +181,7 @@ document.querySelector("aside").addEventListener("scroll", closePop);
 
 const fmtT = ms => ms == null ? "-" : ms < 1 ? ms.toFixed(2) + " ms" : ms < 1000 ? ms.toFixed(ms < 10 ? 1 : 0) + " ms" : (ms / 1000).toFixed(2) + " s";
 const fmtN = n => n == null ? "-" : Math.round(n).toLocaleString("en-US");
-const mhz = () => { const c = info && info.clocks[S.node]; return c && Object.keys(c).length ? Math.min(...Object.values(c)) : 0; };
+const mhz = (lanes = S.lanes, node = S.node) => { const f = units(lanes, node).map(x => x.f); return f.every(x => x) ? Math.min(...f) : 0; };
 const table = () => info && info.cycles[S.lanes];
 const cyc = p => { const t = table().cycles; return t[Math.min(t.length - 1, Math.floor(p / info.at))]; };
 const tps = t => t.length > 1 ? (t.length - 1) / ((t[t.length - 1] - t[0]) / 1000) : 1000 / t[0];
@@ -197,8 +201,8 @@ function segs() {
     el.innerHTML = vals.map(v => `<button data-v="${v}">${k === "node" ? NODE[v] : k === "wbits" ? v + "-bit" : v.toLocaleString("en-US")}</button>`).join("");
     for (const b of el.children) {
       const v = k === "node" ? b.dataset.v : +b.dataset.v;
-      if (k === "lanes" && info && !info.cycles[v]) b.disabled = true;
-      if (k === "node" && info && !info.clocks[v]) b.disabled = true;
+      if (k === "lanes" && info && !(info.cycles[v] && mhz(v))) b.disabled = true;
+      if (k === "node" && info && !mhz(S.lanes, v)) b.disabled = true;
       b.classList.toggle("on", S[k] === v);
       b.onclick = () => {
         S[k] = v;
@@ -523,7 +527,7 @@ try {
   runs = d.runs;
 }
 if (!info.cycles[S.lanes]) S.lanes = +Object.keys(info.cycles)[0] || S.lanes;
-if (!info.clocks[S.node]) S.node = Object.keys(info.clocks)[0] || S.node;
+if (!mhz()) S.node = OPTS.node.find(n => mhz(S.lanes, n)) || S.node;
 const examples = runs ? runs.map(r => r.prompt) : info.examples || [];
 $("examples").innerHTML = examples.map(x => `<button type="button">${x}</button>`).join("");
 [...$("examples").children].forEach((b, i) => b.onclick = () => {
