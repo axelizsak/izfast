@@ -218,6 +218,9 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(404, {"error": "not found"})
 
     def do_POST(self):
+        if self.path == "/api/stop":
+            self.reply(200, {"ok": True})
+            return threading.Thread(target=self.server.shutdown, daemon=True).start()
         if self.path != "/api/ask":
             return self.reply(404, {"error": "not found"})
         if LOCK.locked():
