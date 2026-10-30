@@ -170,7 +170,7 @@ def job(req):
     ids = TEXT.encode((req.get("prompt", "") or "Hello")[:1500])
     n = max(1, min(int(req.get("tokens", 256)), MAX_SEQ - len(ids)))
     log = lambda s: JOB.update(log=s)
-    JOB.update(phase="chip", log="Computing the chip's answer", prompt_len=len(ids), wbits=wbits, chip_n=0)
+    JOB.update(phase="chip", log="C emulator computing the chip's answer, bit for bit", prompt_len=len(ids), wbits=wbits, chip_n=0)
     t0 = time.time()
     chip = EMU.run(wbits, ids, n, log, lambda k: JOB.update(chip_n=k))
     JOB.update(chip=TEXT.pieces(chip), emu_seconds=round(time.time() - t0, 2))

@@ -264,6 +264,7 @@ function play(i) {
   job = { phase: "done", prompt_len: r.prompt_len, chip: w.chip, mac: w.mac, mac_ms: w.mac_ms, mac_tps: w.mac_tps };
   $("m_hw").textContent = w.mac_engine;
   $("replay").style.display = "inline-block";
+  $("msg").textContent = "Chip answer computed by the C emulator, bit for bit, replayed at the chip's speed";
   update();
   race(false);
 }
@@ -275,7 +276,7 @@ async function poll() {
   $("replay").style.display = job.phase === "done" ? "inline-block" : "none";
   if (job.phase === "chip") {
     burst(400);
-    $("msg").textContent = (job.log || "Computing the chip's answer") + (job.chip_n ? ` · ${job.chip_n} tokens` : "");
+    $("msg").textContent = (job.log || "C emulator computing the chip's answer, bit for bit") + (job.chip_n ? ` · ${job.chip_n} tokens` : "");
   }
   if (job.phase === "mac") $("msg").textContent = job.log;
   if ((job.phase === "mac" || job.phase === "done") && !shown) { shown = true; update(); race(true); }
