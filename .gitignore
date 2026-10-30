@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+hw/build/
+hw/tests/results.xml
+*.fst
+*.vcd
+data/
