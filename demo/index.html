@@ -150,13 +150,13 @@ const INFO = {
     "Drag to turn it, scroll to zoom, hover a block to see what it does. Not to scale: the weight memory takes most of the real area."],
 };
 
-function units(lanes = S.lanes, node = S.node) {
+function unitClocks(lanes = S.lanes, node = S.node) {
   const c = info && info.clocks[node] || {}, t = info && info.cycles[lanes], vk = t ? t.vk : 1;
   return Object.keys(UNIT).map(u => ({ u, f: c[`${u}_vk${vk}`] || c[u], small: vk > 1 && u !== "mvu" && !c[`${u}_vk${vk}`] }));
 }
 
 function timed() {
-  const k = units(), fmt = x => `${UNIT[x.u]} ${Math.round(x.f).toLocaleString("en-US")} MHz${x.small ? " (timed on a smaller version)" : ""}`;
+  const k = unitClocks(), fmt = x => `${UNIT[x.u]} ${Math.round(x.f).toLocaleString("en-US")} MHz${x.small ? " (timed on a smaller version)" : ""}`;
   const done = k.filter(x => x.f).map(fmt), todo = k.filter(x => !x.f).map(x => UNIT[x.u]);
   return `Measured at ${NODE[S.node]}: ${done.join(", ") || "nothing yet"}.` + (todo.length ? ` Not timed yet: ${todo.join(", ")}.` : " The chip runs at the slowest one.");
 }
@@ -181,7 +181,7 @@ document.querySelector("aside").addEventListener("scroll", closePop);
 
 const fmtT = ms => ms == null ? "-" : ms < 1 ? ms.toFixed(2) + " ms" : ms < 1000 ? ms.toFixed(ms < 10 ? 1 : 0) + " ms" : (ms / 1000).toFixed(2) + " s";
 const fmtN = n => n == null ? "-" : Math.round(n).toLocaleString("en-US");
-const mhz = (lanes = S.lanes, node = S.node) => { const f = units(lanes, node).map(x => x.f); return f.every(x => x) ? Math.min(...f) : 0; };
+const mhz = (lanes = S.lanes, node = S.node) => { const f = unitClocks(lanes, node).map(x => x.f); return f.every(x => x) ? Math.min(...f) : 0; };
 const table = () => info && info.cycles[S.lanes];
 const cyc = p => { const t = table().cycles; return t[Math.min(t.length - 1, Math.floor(p / info.at))]; };
 const tps = t => t.length > 1 ? (t.length - 1) / ((t[t.length - 1] - t[0]) / 1000) : 1000 / t[0];
