@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>izfast</title>
 <style>
-:root { --bg: #05070a; --panel: #0c0f15; --card: #11151d; --line: #1d2330; --text: #e8ebf1; --dim: #8b93a3; --chip: #ff8a3d; --mac: #6aa9ff; }
+:root { --bg: #05070a; --panel: #0c0f15; --card: #11151d; --line: #1d2330; --text: #e8ebf1; --dim: #8b93a3; --chip: #ff8a3d; --other: #6aa9ff; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", sans-serif; }
-body { display: grid; grid-template-columns: minmax(0, 1fr) 440px; height: 100vh; overflow: hidden; }
+body { display: grid; grid-template-columns: minmax(0, 1fr) 450px; height: 100vh; overflow: hidden; }
 #view { position: relative; overflow: hidden; cursor: grab; }
 #view:active { cursor: grabbing; }
 #view canvas { display: block; }
 #title { position: absolute; top: 18px; left: 22px; pointer-events: none; }
 #title h1 { margin: 0; font-size: 24px; font-weight: 750; letter-spacing: -.01em; }
-#title p { margin: 3px 0 0; color: var(--dim); font-size: 13px; }
+#title p { margin: 3px 0 0; color: var(--dim); font-size: 13px; max-width: 460px; }
 #viewi { position: absolute; top: 22px; right: 20px; }
 #legend { position: absolute; left: 22px; bottom: 16px; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--dim); font-size: 12px; pointer-events: none; }
 #legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }
@@ -30,9 +30,6 @@ aside > * { flex-shrink: 0; }
 #examples { display: flex; flex-wrap: wrap; gap: 6px; }
 #examples button { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 14px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
 #examples button:hover, #examples button.on { color: var(--text); border-color: #3a4558; }
-#local { display: none; color: var(--dim); font-size: 12.5px; }
-#local a { color: var(--chip); text-decoration: none; }
-#local a:hover { text-decoration: underline; }
 #status { color: var(--dim); font-size: 12.5px; min-height: 18px; display: flex; gap: 10px; align-items: center; }
 #replay { display: none; background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 8px; padding: 2px 9px; font: inherit; font-size: 12px; cursor: pointer; }
 .side { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
@@ -42,34 +39,37 @@ aside > * { flex-shrink: 0; }
 .tps b { font-size: 26px; font-weight: 750; letter-spacing: -.02em; }
 .tps small { color: var(--dim); font-size: 12px; margin-left: 4px; }
 .chip .who, .chip .tps b { color: var(--chip); }
-.mac .who, .mac .tps b { color: var(--mac); }
 .bar { height: 3px; border-radius: 2px; background: #1a202b; overflow: hidden; margin: 8px 0 7px; }
-.bar div { height: 100%; width: 0; }
-.chip .bar div { background: var(--chip); }
-.mac .bar div { background: var(--mac); }
+.bar div { height: 100%; width: 0; background: var(--chip); }
 .stats { display: flex; flex-wrap: wrap; gap: 3px 14px; color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
 .stats b { color: var(--text); font-weight: 600; }
-.text { margin-top: 8px; min-height: 54px; max-height: 160px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5; color: #d5dae3; }
-#verdict { text-align: center; min-height: 34px; padding-bottom: 8px; font-variant-numeric: tabular-nums; }
-#verdict b { font-size: 26px; font-weight: 800; background: linear-gradient(90deg, var(--chip), var(--mac)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.text { margin-top: 8px; min-height: 54px; max-height: 170px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.5; color: #d5dae3; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.row:first-of-type { border-top: 0; }
+.row .n { font-size: 12.5px; font-weight: 600; }
+.row .n small { color: var(--dim); font-weight: 400; margin-left: 5px; }
+.row .t { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+.row .t b { color: var(--text); }
+.row .bar { grid-column: 1 / -1; margin: 4px 0 0; }
+.row .bar div { background: var(--other); }
+.row.me .bar div { background: var(--chip); }
+.row.me .n { color: var(--chip); }
+#verdict { text-align: center; min-height: 34px; padding-bottom: 6px; font-variant-numeric: tabular-nums; }
+#verdict b { font-size: 26px; font-weight: 800; background: linear-gradient(90deg, var(--chip), var(--other)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 #verdict span { display: block; color: var(--dim); font-size: 12px; }
-#settings { border-top: 1px solid var(--line); padding-top: 4px; }
-.set { display: grid; grid-template-columns: 118px 1fr; align-items: center; gap: 2px 10px; padding: 8px 0; }
+#spec { border-top: 1px solid var(--line); padding-top: 4px; }
+.set { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 2px 10px; padding: 7px 0; }
 .set label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
-.seg { display: flex; gap: 4px; }
-.seg button { flex: 1; background: #0b0e13; color: var(--dim); border: 1px solid var(--line); border-radius: 8px; padding: 5px 2px; font: inherit; font-size: 12.5px; cursor: pointer; }
-.seg button.on { color: var(--text); border-color: #4a5568; background: #1a2130; }
-.seg button:disabled { opacity: .35; cursor: not-allowed; }
-.val { grid-column: 2; color: var(--dim); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.val { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
 .val b { color: var(--text); font-weight: 600; }
 .i { width: 17px; height: 17px; border-radius: 50%; border: 1px solid #3a4352; background: rgba(5, 7, 10, .6); color: var(--dim); font: italic 700 11px/15px Georgia, serif; padding: 0; cursor: pointer; flex: none; }
 .i:hover, .i.on { color: var(--text); border-color: var(--dim); }
-#pop { position: fixed; z-index: 10; width: 300px; background: #141925; border: 1px solid #2c3546; border-radius: 10px; padding: 11px 13px; font-size: 13px; line-height: 1.5; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); display: none; }
+#pop { position: fixed; z-index: 10; width: 310px; background: #141925; border: 1px solid #2c3546; border-radius: 10px; padding: 11px 13px; font-size: 13px; line-height: 1.5; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); display: none; }
 #pop b { display: block; margin-bottom: 4px; }
 #pop p { margin: 0 0 6px; color: #c3cad6; }
 #pop p:last-child { margin: 0; }
-#foot { margin-top: auto; color: var(--dim); font-size: 12px; }
-#foot { display: flex; justify-content: space-between; align-items: center; }
+#pop a { color: var(--other); }
+#foot { margin-top: auto; color: var(--dim); font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
 #foot a { color: var(--dim); }
 #stop { display: none; background: none; border: 1px solid #5a2a2a; color: #e08080; border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
 #stop:hover { background: #2a1414; }
@@ -86,33 +86,31 @@ aside > * { flex-shrink: 0; }
 </head>
 <body>
 <div id="view">
-  <div id="title"><h1>izfast</h1><p>A chip that runs Llama 3.2 1B as fast as it can</p></div>
+  <div id="title"><h1>izfast</h1><p>Today's hardware was not built to run AI models. izfast is a chip built for one model, for when latency matters.</p></div>
   <button class="i" id="viewi" data-i="view">i</button>
-  <div id="legend"><span><i style="background:#4a86d8"></i>weight memory</span><span><i style="background:#ff8a3d"></i>multipliers</span><span><i style="background:#3dffa8"></i>vector unit</span><span><i style="background:#c77dff"></i>attention</span><span><i style="background:#ffe066"></i>buffers</span></div>
+  <div id="legend"><span><i style="background:#4a86d8"></i>weight memory</span><span><i style="background:#ff8a3d"></i>multipliers</span><span><i style="background:#3dffa8"></i>vector unit</span><span><i style="background:#c77dff"></i>attention</span><span><i style="background:#ff5d8f"></i>linear attention</span><span><i style="background:#ffe066"></i>buffers</span></div>
   <div id="tip"></div>
 </div>
 <aside>
   <form id="ask"><textarea id="prompt" maxlength="1500" placeholder="Ask anything"></textarea><button id="go">Ask</button></form>
   <div id="examples"></div>
-  <div id="local">Want to try your own prompt? <a href="https://github.com/axelizsak/izfast#running-it">Try it locally</a></div>
   <div id="status"><span id="msg"></span><button id="replay">Replay</button></div>
   <section class="side chip">
-    <div class="head"><span class="who">izfast chip <button class="i" data-i="chip">i</button></span><span class="tps"><b id="c_tps">-</b><small>tokens/s</small></span></div>
+    <div class="head"><span class="who">izfast · Qwen3.5-4B <button class="i" data-i="chip">i</button></span><span class="tps"><b id="c_tps">-</b><small>tokens/s</small></span></div>
     <div class="bar"><div id="c_bar"></div></div>
-    <div class="stats"><span>first token <b id="c_ttft">-</b></span><span>total <b id="c_total">-</b></span><span><b id="c_cyc">-</b> cycles/token</span></div>
+    <div class="stats"><span>first token <b id="c_ttft">-</b></span><span>whole answer <b id="c_total">-</b></span><span><b id="c_cyc">-</b> cycles/token</span></div>
     <div class="text" id="c_text"></div>
   </section>
-  <section class="side mac">
-    <div class="head"><span class="who"><span id="m_who">Your Mac</span> <button class="i" data-i="mac">i</button></span><span class="tps"><b id="m_tps">-</b><small>tokens/s</small></span></div>
-    <div class="bar"><div id="m_bar"></div></div>
-    <div class="stats"><span>first token <b id="m_ttft">-</b></span><span>total <b id="m_total">-</b></span><span id="m_hw"></span></div>
-    <div class="text" id="m_text"></div>
+  <section class="side">
+    <div class="head"><span class="who">The same answer on today's hardware <button class="i" data-i="market">i</button></span></div>
+    <div id="rows"></div>
   </section>
   <div id="verdict"></div>
-  <div id="settings">
-    <div class="set"><label>Lanes <button class="i" data-i="lanes">i</button></label><div class="seg" id="s_lanes"></div><div class="val" id="v_lanes"></div></div>
-    <div class="set"><label>Weight bits <button class="i" data-i="wbits">i</button></label><div class="seg" id="s_wbits"></div><div class="val" id="v_wbits"></div></div>
-    <div class="set"><label>Process <button class="i" data-i="node">i</button></label><div class="seg" id="s_node"></div><div class="val" id="v_node"></div></div>
+  <div id="spec">
+    <div class="set"><label>Chip <button class="i" data-i="lanes">i</button></label><div class="val" id="v_lanes"></div></div>
+    <div class="set"><label>Clock <button class="i" data-i="clock">i</button></label><div class="val" id="v_clock"></div></div>
+    <div class="set"><label>Weights <button class="i" data-i="weights">i</button></label><div class="val" id="v_weights"></div></div>
+    <div class="set"><label>Quality <button class="i" data-i="quality">i</button></label><div class="val" id="v_quality"></div></div>
   </div>
   <div id="foot"><a href="https://github.com/axelizsak/izfast">github.com/axelizsak/izfast</a><button id="stop">Stop demo</button></div>
 </aside>
@@ -126,50 +124,47 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 const $ = id => document.getElementById(id);
-const S = { lanes: 1024, wbits: 4, node: "asap7" };
-const OPTS = { lanes: [256, 1024], wbits: [4, 8], node: ["sky130hd", "asap7"] };
-const NODE = { sky130hd: "130 nm", asap7: "7 nm" };
-const UNIT = { mvu: "matrix unit", vpu: "vector unit", attn: "attention unit" };
-let info = null, job = null, runs = null, sel = -1, raf = 0, shown = false, burstUntil = 0;
+const UNIT = { lanes: "lanes", vector: "vector unit", deltanet: "linear-attention unit", attention: "attention unit" };
+let info = null, job = null, runs = null, sel = -1, raf = 0, burstUntil = 0, shown = false;
+
+const fmtT = ms => ms == null ? "-" : ms < 1 ? ms.toFixed(2) + " ms" : ms < 1000 ? ms.toFixed(ms < 10 ? 1 : 0) + " ms" : (ms / 1000).toFixed(ms < 10000 ? 2 : 1) + " s";
+const fmtN = n => n == null ? "-" : Math.round(n).toLocaleString("en-US");
+const mhz = () => { const f = Object.values(info.clocks); return f.length ? Math.min(...f) : 0; };
+const slowest = () => Object.entries(info.clocks).sort((a, b) => a[1] - b[1])[0];
+const cyc = p => {
+  const pts = Object.entries(info.cycles).map(([k, v]) => [+k, v]).sort((a, b) => a[0] - b[0]);
+  for (let i = 1; i < pts.length; i++) if (p <= pts[i][0]) return pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * (p - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]);
+  return pts[pts.length - 1][1];
+};
+const chipTps = () => mhz() * 1e6 / cyc(0);
 
 const INFO = {
-  chip: () => ["izfast chip", "This chip is not manufactured. Its answer comes from an exact model of its arithmetic, checked bit for bit against the simulation of its circuit running Llama 3.2 1B.",
-    "Its time is real: the clock cycles counted in that simulation for every token, divided by the clock frequency of the synthesized circuit."
-    + (job && job.emu_seconds ? ` Computing this answer on your CPU took ${job.emu_seconds} s.` : "")],
-  mac: () => runs
-    ? [info.cpu, `Recorded on an ${info.cpu} laptop: llama.cpp on its GPU (Metal), same model, same question, same weight precision as the chip.`,
-       "Run the project on your own computer to race it with your own questions."]
-    : ["Your Mac", `Measured live on ${info ? info.cpu : "your Mac"}: llama.cpp on the GPU (Metal), same model, same question, same weight precision as the chip.`],
-  lanes: () => ["Lanes", "A lane is a small compute unit with its own memory bank. The model's weights are split across all lanes.",
-    "Every clock cycle, each lane reads 32 weights and multiplies them with the input. More lanes: more weights per cycle, fewer cycles per token, but a bigger chip."],
-  wbits: () => ["Weight bits", "How many bits store each weight in the chip's memory.",
-    "4 bits needs half the memory of 8 bits, so a smaller chip, and the answer changes slightly. The speed is the same: a lane reads one group of 32 weights per cycle either way."],
-  node: () => ["Process", "The manufacturing technology. 130 nm is SkyWater's open process. 7 nm is ASAP7, a research model of a modern 7 nm process.",
-    "Smaller transistors switch faster, so the same circuit runs at a higher clock. The clock is measured: the circuit is synthesized into logic gates and its slowest path is timed.", timed()],
-  view: () => ["The chip", "A sketch of the floor plan: lanes with their weight banks and multipliers, the vector unit, the attention unit with its key-value cache, and the buffers. The light shows data moving between them.",
+  chip: () => ["izfast chip", "The chip is not manufactured yet. Its answer comes from an exact model of its arithmetic, checked bit for bit against the simulation of its circuit running Qwen3.5-4B.",
+    "Its time is real: the clock cycles counted in that simulation for every token, divided by the clock frequency of the synthesized circuit. Cycles are measured at contexts 0, 511 and 1023 and interpolated in between."
+    + (job && job.emu_seconds ? ` Computing this answer on a laptop CPU took ${job.emu_seconds} s.` : "")],
+  market: () => ["Today's hardware", "Published speeds for one user, from the vendors or independent tests, on models of similar size. Not measured by izfast.",
+    ...info.market.map(m => `<a href="${m.url}" target="_blank" rel="noopener">${m.name}</a>: ${m.tps.toLocaleString("en-US")} tokens/s, ${m.model}, ${m.how}.`)],
+  lanes: () => ["Chip", "A lane is a small compute unit with its own weight memory. The model's weights are split across all lanes; every clock cycle each lane reads 32 weights.",
+    "Qwen3.5-4B mixes 24 linear-attention layers, which keep a fixed-size memory of the conversation, with 8 classic attention layers. The chip has a unit for each."],
+  clock: () => ["Clock", "Each unit is synthesized into logic gates for a 7 nm process (ASAP7) and its slowest path is timed, before placement and routing. The chip runs at its slowest unit.",
+    Object.entries(info.clocks).map(([k, v]) => `${UNIT[k]} ${fmtN(v)} MHz`).join(", ") + "."],
+  weights: () => ["Weights", "Layers are stored on 4 bits per weight in groups of 32 with a 16-bit scale, the output head on 8 bits. They sit next to the lanes, so no memory traffic leaves the chip."],
+  quality: () => ["Quality", "Perplexity of the chip's integer arithmetic against the original model in floating point, on technical English text. Lower is better.",
+    info.quality.chip_w4h8 ? `Same next token as the original model ${(100 * info.quality.chip_w4h8.same_next_token).toFixed(0)}% of the time.` : ""],
+  view: () => ["The chip", "A sketch of the floor plan: lanes with their weight banks and multipliers, the vector unit, the attention unit with its key-value cache, and the linear-attention unit with its state memory. The light shows data moving between them.",
     "Drag to turn it, scroll to zoom, hover a block to see what it does. Not to scale: the weight memory takes most of the real area."],
 };
-
-function unitClocks(lanes = S.lanes, node = S.node) {
-  const c = info && info.clocks[node] || {}, t = info && info.cycles[lanes], vk = t ? t.vk : 1;
-  return Object.keys(UNIT).map(u => ({ u, f: c[`${u}_vk${vk}`] || c[u], small: vk > 1 && u !== "mvu" && !c[`${u}_vk${vk}`] }));
-}
-
-function timed() {
-  const k = unitClocks(), fmt = x => `${UNIT[x.u]} ${Math.round(x.f).toLocaleString("en-US")} MHz${x.small ? " (timed on a smaller version)" : ""}`;
-  const done = k.filter(x => x.f).map(fmt), todo = k.filter(x => !x.f).map(x => UNIT[x.u]);
-  return `Measured at ${NODE[S.node]}: ${done.join(", ") || "nothing yet"}.` + (todo.length ? ` Not timed yet: ${todo.join(", ")}.` : " The chip runs at the slowest one.");
-}
 
 const pop = $("pop");
 let popKey = null;
 const closePop = () => { pop.style.display = "none"; popKey = null; document.querySelectorAll(".i.on").forEach(x => x.classList.remove("on")); };
 document.addEventListener("click", e => {
   const b = e.target.closest(".i");
-  if (!b || popKey === b.dataset.i) { closePop(); return; }
+  if (!b) { if (!e.target.closest("#pop")) closePop(); return; }
+  if (popKey === b.dataset.i) { closePop(); return; }
   closePop();
   const [title, ...ps] = INFO[b.dataset.i]();
-  pop.innerHTML = `<b>${title}</b>` + ps.map(p => `<p>${p}</p>`).join("");
+  pop.innerHTML = `<b>${title}</b>` + ps.filter(Boolean).map(p => `<p>${p}</p>`).join("");
   pop.style.display = "block";
   const r = b.getBoundingClientRect();
   pop.style.left = Math.max(8, Math.min(r.left - 12, innerWidth - pop.offsetWidth - 8)) + "px";
@@ -178,13 +173,6 @@ document.addEventListener("click", e => {
   popKey = b.dataset.i;
 });
 document.querySelector("aside").addEventListener("scroll", closePop);
-
-const fmtT = ms => ms == null ? "-" : ms < 1 ? ms.toFixed(2) + " ms" : ms < 1000 ? ms.toFixed(ms < 10 ? 1 : 0) + " ms" : (ms / 1000).toFixed(2) + " s";
-const fmtN = n => n == null ? "-" : Math.round(n).toLocaleString("en-US");
-const mhz = (lanes = S.lanes, node = S.node) => { const f = unitClocks(lanes, node).map(x => x.f); return f.every(x => x) ? Math.min(...f) : 0; };
-const table = () => info && info.cycles[S.lanes];
-const cyc = p => { const t = table().cycles; return t[Math.min(t.length - 1, Math.floor(p / info.at))]; };
-const tps = t => t.length > 1 ? (t.length - 1) / ((t[t.length - 1] - t[0]) / 1000) : 1000 / t[0];
 
 function chipTimes(P, n) {
   const f = mhz() * 1e3;
@@ -195,101 +183,84 @@ function chipTimes(P, n) {
   return t;
 }
 
-function segs() {
-  for (const [k, vals] of Object.entries(OPTS)) {
-    const el = $("s_" + k);
-    el.innerHTML = vals.map(v => `<button data-v="${v}">${k === "node" ? NODE[v] : k === "wbits" ? v + "-bit" : v.toLocaleString("en-US")}</button>`).join("");
-    for (const b of el.children) {
-      const v = k === "node" ? b.dataset.v : +b.dataset.v;
-      if (k === "lanes" && info && !(info.cycles[v] && mhz(v))) b.disabled = true;
-      if (k === "node" && info && !mhz(S.lanes, v)) b.disabled = true;
-      b.classList.toggle("on", S[k] === v);
-      b.onclick = () => {
-        S[k] = v;
-        segs();
-        if (k === "lanes") build();
-        if (k === "wbits" && runs && sel >= 0) play(sel);
-        else update();
-      };
-    }
-  }
+function rows() {
+  $("rows").innerHTML = info.market.map((m, i) => `<div class="row"><span class="n">${m.name}<small>${m.where}</small></span>`
+    + `<span class="t"><b>${m.tps.toLocaleString("en-US")}</b> tokens/s · <span id="m_t${i}">-</span></span><div class="bar"><div id="m_b${i}"></div></div></div>`).join("");
 }
 
-function update() {
-  if (!info) return;
-  const f = mhz();
-  $("v_lanes").innerHTML = `<b>${fmtN(32 * S.lanes)}</b> multiply-adds per cycle`;
-  $("v_wbits").innerHTML = `<b>${(info.weight_bytes[S.wbits] / 1e9).toFixed(2)} GB</b> of weights on chip`;
-  $("v_node").innerHTML = f ? `<b>${fmtN(f)} MHz</b> clock` : "not timed";
-  if (!table() || !f) return;
-  const P = job && job.prompt_len || 0;
-  $("c_cyc").textContent = fmtN(cyc(P));
-  if (!job || !job.chip) { $("c_tps").textContent = fmtN(f * 1e6 / cyc(0)); return; }
-  const ct = chipTimes(P, job.chip.length);
-  $("c_tps").textContent = fmtN(tps(ct));
-  $("c_ttft").textContent = fmtT(ct[0]);
-  $("c_total").textContent = fmtT(ct[ct.length - 1]);
-  if (job.phase === "done" && job.mac_tps)
-    $("verdict").innerHTML = `<b>${fmtN(tps(ct) / job.mac_tps)}× faster</b><span>${fmtN(tps(ct))} against ${fmtN(job.mac_tps)} tokens per second</span>`;
+function spec() {
+  const f = mhz(), s = slowest();
+  $("v_lanes").innerHTML = `<b>${fmtN(info.lanes)}</b> lanes, <b>${fmtN(32 * info.lanes)}</b> multiply-adds per cycle`;
+  $("v_clock").innerHTML = f ? `<b>${fmtN(f)} MHz</b> at 7 nm, set by the ${UNIT[s[0]]}` : "not timed yet";
+  $("v_weights").innerHTML = `<b>${(info.weight_bytes / 1e9).toFixed(2)} GB</b> on chip, 4-bit layers, 8-bit head`;
+  const q = info.quality;
+  $("v_quality").innerHTML = q.chip_w4h8 ? `perplexity <b>${q.chip_w4h8.perplexity.toFixed(2)}</b> against <b>${q.reference.perplexity.toFixed(2)}</b> for the original` : "-";
+  $("c_cyc").textContent = fmtN(cyc(job && job.prompt_len || 0));
+  if (!job || !job.chip) $("c_tps").textContent = fmtN(chipTps());
 }
 
 function reset() {
-  for (const id of ["c_text", "m_text", "verdict", "c_ttft", "c_total", "m_ttft", "m_total", "m_tps", "m_hw"]) $(id).textContent = "";
-  for (const id of ["c_bar", "m_bar"]) $(id).style.width = "0";
+  for (const id of ["c_text", "verdict", "c_ttft", "c_total"]) $(id).textContent = "";
+  $("c_bar").style.width = "0";
+  info.market.forEach((m, i) => { $("m_b" + i).style.width = "0"; $("m_t" + i).textContent = "-"; });
   cancelAnimationFrame(raf);
   shown = false;
 }
 
-function race(live) {
+function race() {
   cancelAnimationFrame(raf);
-  burst(1000);
-  const t0 = performance.now(), ct = chipTimes(job.prompt_len, job.chip.length);
+  burst(1200);
+  const n = job.chip.length, ct = chipTimes(job.prompt_len, n), t0 = performance.now();
+  const total = ct[n - 1], tps = n > 1 ? (n - 1) / ((ct[n - 1] - ct[0]) / 1000) : 1000 / ct[0];
+  $("c_tps").textContent = fmtN(tps);
+  $("c_ttft").textContent = fmtT(ct[0]);
+  $("c_total").textContent = fmtT(total);
+  $("c_cyc").textContent = fmtN(cyc(job.prompt_len));
+  const local = info.market.filter(m => !m.where.startsWith("datacenter")).sort((a, b) => b.tps - a.tps)[0];
+  $("verdict").innerHTML = `<b>${fmtN(tps / local.tps)}× faster</b><span>than the fastest local device listed (${local.name}, ${local.tps} tokens/s)</span>`;
   const step = () => {
-    const now = performance.now() - t0, mt = job.mac_ms || [], mp = job.mac || [];
-    let k = 0, j = 0;
-    while (k < ct.length && ct[k] <= now) k++;
-    while (j < mt.length && (live || mt[j] <= now)) j++;
+    const now = performance.now() - t0;
+    let k = 0;
+    while (k < n && ct[k] <= now) k++;
     $("c_text").textContent = job.chip.slice(0, k).join("");
-    $("c_bar").style.width = (100 * k / ct.length) + "%";
-    $("m_text").textContent = mp.slice(0, j).join("");
-    $("m_bar").style.width = Math.min(100, 100 * j / Math.max(1, job.phase === "done" ? mt.length : job.chip.length)) + "%";
-    $("m_ttft").textContent = j ? fmtT(mt[0]) : "-";
-    $("m_total").textContent = j ? fmtT(live || j === mt.length ? mt[j - 1] : now) : "-";
-    $("m_tps").textContent = job.mac_tps && (live || j === mt.length) ? fmtN(job.mac_tps) : j > 1 ? fmtN(tps(mt.slice(0, j))) : "-";
-    for (const el of [$("c_text"), $("m_text")]) el.scrollTop = el.scrollHeight;
-    if ((live && job.phase === "mac") || k < ct.length || (!live && j < mt.length)) raf = requestAnimationFrame(step);
+    $("c_bar").style.width = (100 * k / n) + "%";
+    $("c_text").scrollTop = $("c_text").scrollHeight;
+    let busy = k < n;
+    info.market.forEach((m, i) => {
+      const need = 1000 * n / m.tps, done = Math.min(1, now / need);
+      $("m_b" + i).style.width = (100 * done) + "%";
+      $("m_t" + i).innerHTML = done < 1 ? fmtT(now) : `<b>${fmtT(need)}</b>`;
+      busy = busy || done < 1;
+    });
+    if (busy) raf = requestAnimationFrame(step);
   };
   step();
 }
 
 function play(i) {
   sel = i;
-  const r = runs[i], w = r[S.wbits];
+  const r = runs[i];
   $("prompt").value = r.prompt;
   [...$("examples").children].forEach((b, k) => b.classList.toggle("on", k === i));
   reset();
-  job = { phase: "done", prompt_len: r.prompt_len, chip: w.chip, mac: w.mac, mac_ms: w.mac_ms, mac_tps: w.mac_tps };
-  $("m_hw").textContent = w.mac_engine;
+  job = { phase: "done", prompt_len: r.prompt_len, chip: r.chip, emu_seconds: r.emu_seconds };
   $("replay").style.display = "inline-block";
-  $("msg").textContent = "Chip answer computed by the C emulator, bit for bit, replayed at the chip's speed";
-  update();
-  race(false);
+  $("msg").textContent = "Answer computed by the C emulator, bit for bit, replayed at the chip's speed";
+  race();
 }
 
 async function poll() {
   job = await (await fetch("api/job")).json();
-  const busy = job.phase === "chip" || job.phase === "mac";
+  const busy = job.phase === "chip";
   $("go").disabled = busy;
   $("replay").style.display = job.phase === "done" ? "inline-block" : "none";
-  if (job.phase === "chip") {
+  if (busy) {
     burst(400);
     $("msg").textContent = (job.log || "C emulator computing the chip's answer, bit for bit") + (job.chip_n ? ` · ${job.chip_n} tokens` : "");
   }
-  if (job.phase === "mac") $("msg").textContent = job.log;
-  if ((job.phase === "mac" || job.phase === "done") && !shown) { shown = true; update(); race(true); }
-  if (job.phase === "done") { $("msg").textContent = ""; $("m_hw").textContent = job.mac_engine || ""; update(); }
+  if (job.phase === "done" && !shown) { shown = true; $("msg").textContent = "Answer computed by the C emulator, bit for bit, replayed at the chip's speed"; race(); }
   if (job.phase === "error") $("msg").textContent = "Error: " + job.log;
-  if (busy) setTimeout(poll, 60);
+  if (busy) setTimeout(poll, 80);
 }
 
 $("ask").onsubmit = async e => {
@@ -297,7 +268,7 @@ $("ask").onsubmit = async e => {
   if (runs) { const i = runs.findIndex(r => r.prompt === $("prompt").value); play(i >= 0 ? i : Math.max(0, sel)); return; }
   if ($("go").disabled) return;
   reset();
-  const r = await fetch("api/ask", { method: "POST", body: JSON.stringify({ prompt: $("prompt").value, wbits: S.wbits, tokens: 256 }) });
+  const r = await fetch("api/ask", { method: "POST", body: JSON.stringify({ prompt: $("prompt").value, tokens: 256 }) });
   if (r.ok) poll();
 };
 $("prompt").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask").requestSubmit(); } };
@@ -307,7 +278,7 @@ $("stop").onclick = async () => {
   $("go").disabled = true;
   $("msg").textContent = "Demo stopped. Run make demo to start it again.";
 };
-$("replay").onclick = () => { if (runs && sel >= 0) play(sel); else if (job && job.phase === "done") race(false); };
+$("replay").onclick = () => { if (runs && sel >= 0) play(sel); else if (job && job.phase === "done") race(); };
 
 const view = $("view");
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -337,15 +308,17 @@ composer.addPass(new RenderPass(scene, camera));
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.85, 0.5, 0.32));
 composer.addPass(new OutputPass());
 
-const COL = { sram: [0x1d2940, 0x4a86d8], mac: [0x3a1a0c, 0xff8a3d], vpu: [0x12382a, 0x3dffa8], attn: [0x2c1a3a, 0xc77dff], kv: [0x221c33, 0x9b79e6], buf: [0x2e2a12, 0xffe066], seq: [0x1c1f26, 0xaeb6c6], emb: [0x1a2a3a, 0x7fd1ff] };
+const COL = { sram: [0x1d2940, 0x4a86d8], mac: [0x3a1a0c, 0xff8a3d], vpu: [0x12382a, 0x3dffa8], attn: [0x2c1a3a, 0xc77dff], kv: [0x221c33, 0x9b79e6], buf: [0x2e2a12, 0xffe066], seq: [0x1c1f26, 0xaeb6c6], emb: [0x1a2a3a, 0x7fd1ff], dnu: [0x3a1222, 0xff5d8f], state: [0x2a1420, 0xd8668c] };
 const PARTS = {
   sram: ["Weight memory", "One bank per lane, holding that lane's share of every weight matrix. It delivers 32 weights and their scale every cycle."],
   mac: ["Multipliers", "32 multipliers and an adder tree per lane: 32 weights times 32 inputs every cycle."],
   xbuf: ["Input buffer", "The input vector of the current matrix product, sent to every lane."],
   ybuf: ["Output buffer", "Results leave the lanes here while the lanes already compute the next rows."],
-  vpu: ["Vector unit", "Normalization, activation, residual additions and the conversion to 8-bit numbers."],
-  attn: ["Attention unit", "Position encoding and attention over every earlier token."],
-  kv: ["Key-value cache", "What the model remembers of every earlier token, split in 32 banks so one read returns 32 tokens."],
+  vpu: ["Vector unit", "Normalization, activation, gates, residual additions and the conversion to 8-bit numbers."],
+  attn: ["Attention unit", "Position encoding and attention over every earlier token, for the 8 attention layers."],
+  kv: ["Key-value cache", "What the 8 attention layers remember of every earlier token."],
+  dnu: ["Linear-attention unit", "Runs the 24 linear-attention layers: a short convolution, then the update of a fixed-size memory, 8 heads at a time."],
+  state: ["State memory", "The fixed-size memory of the 24 linear-attention layers. It does not grow with the conversation."],
   vmem: ["Vector memory", "The intermediate vectors of the current token."],
   seq: ["Sequencer", "Runs the fixed program of the model, the same for every token."],
   tbl: ["Lookup tables", "Square roots, exponentials, sigmoid and rotation angles."],
@@ -362,7 +335,7 @@ function box(w, h, d, color, x, y, z, metal = 0.2, rough = 0.6) {
 
 function grid(key, kind, n, cols, x0, z0, w, d, h, fill = 0.82, fz = fill, oz = 0) {
   const rows = Math.ceil(n / cols), cw = w / cols, cd = d / rows;
-  const mat = ["sram", "kv", "emb"].includes(kind) ? new THREE.MeshStandardMaterial({ metalness: 0.45, roughness: 0.5 }) : new THREE.MeshBasicMaterial();
+  const mat = ["sram", "kv", "emb", "state"].includes(kind) ? new THREE.MeshStandardMaterial({ metalness: 0.45, roughness: 0.5 }) : new THREE.MeshBasicMaterial();
   const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(cw * fill, h, cd * fz), mat, n);
   const m4 = new THREE.Matrix4(), c = new THREE.Color(COL[kind][0]);
   for (let i = 0; i < n; i++) {
@@ -428,7 +401,7 @@ function build() {
   chip = new THREE.Group();
   scene.add(chip);
   units = {}; pickables = [];
-  const m = info ? info.model : { n_layers: 16, n_kv_heads: 8, n_heads: 32 }, vk = table() ? table().vk : 4, rep = m.n_heads / m.n_kv_heads;
+  const m = info.model, vk = info.vk, rep = m.n_heads / m.n_kv_heads, lanes = info.lanes;
   box(25, 1.0, 25, 0x0b2a22, 0, -1.3, 0, 0.1, 0.9);
   box(20.6, 0.3, 20.6, 0x0d1015, 0, -0.3, 0, 0.5, 0.45);
   const pads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.08, 0.34), new THREE.MeshStandardMaterial({ color: 0x9c7e3a, metalness: 0.6, roughness: 0.55 }), 112);
@@ -439,15 +412,17 @@ function build() {
     pads.setMatrixAt(i, m4);
   }
   chip.add(pads);
-  const cols = Math.ceil(Math.sqrt(S.lanes)), x0 = -9.2, z0 = -9.2, w = 11.8, d = 12, h = Math.max(0.25, Math.min(1.0, 9 / cols));
-  grid("sram", "sram", S.lanes, cols, x0, z0, w, d, h, 0.86, 0.6, -0.14);
-  grid("mac", "mac", S.lanes, cols, x0, z0, w, d, 0.12, 0.86, 0.2, 0.3);
+  const cols = Math.ceil(Math.sqrt(lanes)), x0 = -9.2, z0 = -9.2, w = 11.8, d = 12, h = Math.max(0.25, Math.min(1.0, 9 / cols));
+  grid("sram", "sram", lanes, cols, x0, z0, w, d, h, 0.86, 0.6, -0.14);
+  grid("mac", "mac", lanes, cols, x0, z0, w, d, 0.12, 0.86, 0.2, 0.3);
   grid("xbuf", "buf", 1, 1, x0, 3.1, w, 0.45, 0.16, 0.98);
   grid("ybuf", "buf", 1, 1, x0, 3.75, w, 0.45, 0.16, 0.98);
   grid("vpu", "vpu", 32 * vk, 16 * vk, x0, 4.5, w, 1.4, 0.2, 0.8);
   grid("emb", "emb", 12, 12, x0, 6.4, w, 2.8, 0.45, 0.9);
-  grid("attn", "attn", (info ? info.at : 32) * rep, info ? info.at : 32, 3.6, -9.2, 5.6, 4.6, 0.22, 0.8);
-  grid("kv", "kv", m.n_layers * m.n_kv_heads, m.n_kv_heads * 2, 3.6, -4.2, 5.6, 6.2, 0.5, 0.9);
+  grid("attn", "attn", info.at * rep, info.at * 2, 3.6, -9.2, 5.6, 2.2, 0.22, 0.8);
+  grid("kv", "kv", m.attention_layers * m.n_kv_heads, m.n_kv_heads * 2, 3.6, -6.8, 5.6, 2.4, 0.5, 0.9);
+  grid("dnu", "dnu", 8, 8, 3.6, -4.2, 5.6, 1.0, 0.25, 0.8);
+  grid("state", "state", m.linear_layers * 4, 12, 3.6, -3.0, 5.6, 4.8, 0.5, 0.9);
   grid("vmem", "sram", 8, 4, 3.6, 2.4, 5.6, 2.6, 0.4, 0.9);
   grid("seq", "seq", 2, 2, 3.6, 5.4, 2.6, 3.8, 0.3, 0.88);
   grid("tbl", "buf", 4, 2, 6.6, 5.4, 2.6, 3.8, 0.25, 0.86);
@@ -526,8 +501,6 @@ try {
   info = d.info;
   runs = d.runs;
 }
-if (!info.cycles[S.lanes]) S.lanes = +Object.keys(info.cycles)[0] || S.lanes;
-if (!mhz()) S.node = OPTS.node.find(n => mhz(S.lanes, n)) || S.node;
 const examples = runs ? runs.map(r => r.prompt) : info.examples || [];
 $("examples").innerHTML = examples.map(x => `<button type="button">${x}</button>`).join("");
 [...$("examples").children].forEach((b, i) => b.onclick = () => {
@@ -537,15 +510,13 @@ $("examples").innerHTML = examples.map(x => `<button type="button">${x}</button>
 if (runs) {
   $("prompt").readOnly = true;
   $("prompt").placeholder = "Pick a question below";
-  $("m_who").textContent = info.cpu;
-  $("local").style.display = "block";
 }
 if (!runs) $("stop").style.display = "inline-block";
-segs(); build(); resize(); update();
+rows(); spec(); build(); resize();
 if (runs) play(0);
 else {
   const j = await (await fetch("api/job")).json();
-  if (j.phase === "chip" || j.phase === "mac") poll();
+  if (j.phase === "chip") poll();
 }
 </script>
 </body>
