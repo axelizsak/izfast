@@ -1,6 +1,7 @@
 module attn #(
   parameter int VK      = 4,
   parameter int HD      = 64,
+  parameter int RD      = HD,
   parameter int NKV     = 2,
   parameter int REP     = 2,
   parameter int NLAYERS = 4,
@@ -10,9 +11,9 @@ module attn #(
   input  logic               clk,
   input  logic               rst_n,
   input  logic               tbl_we,
-  input  logic [2:0]         tbl_sel,
+  input  logic [3:0]         tbl_sel,
   input  logic [31:0]        tbl_addr,
-  input  logic [16:0]        tbl_data,
+  input  logic [31:0]        tbl_data,
   input  logic               tok_start,
   input  logic [31:0]        pos,
   input  logic               q_we,
@@ -59,8 +60,14 @@ module attn #(
   endfunction
 
   function automatic int bitlen(input logic [47:0] v);
-    bitlen = 0;
-    for (int k = 0; k < 48; k++) if (v[k]) bitlen = k + 1;
+    int hi, lo;
+    logic [7:0] b;
+    hi = 0;
+    for (int k = 1; k < 6; k++) if (v[k*8 +: 8] != 0) hi = k;
+    b = v[hi*8 +: 8];
+    lo = 0;
+    for (int k = 0; k < 8; k++) if (b[k]) lo = k + 1;
+    bitlen = (lo == 0) ? 0 : hi * 8 + lo;
   endfunction
 
   function automatic int sh_a(input logic [47:0] m);
@@ -78,6 +85,16 @@ module attn #(
     if (s == 0) t = 49'(x);
     else t = (49'(x) + (49'(1) <<< (s - 1))) >>> s;
     q8 = (t > 127) ? 8'sd127 : (t < -127) ? -8'sd127 : t[7:0];
+  endfunction
+
+  function automatic logic signed [49:0] h50(input v48 x, input int s);
+    h50 = (s == 0) ? 50'(x) <<< 1 : 50'(x) >>> (s - 1);
+  endfunction
+
+  function automatic logic [7:0] sat8(input logic signed [49:0] h);
+    logic signed [49:0] t;
+    t = (h + 50'sd1) >>> 1;
+    sat8 = (t > 127) ? 8'sd127 : (t < -127) ? -8'sd127 : t[7:0];
   endfunction
 
   function automatic v48 rnd(input logic signed [127:0] v, input int n);
@@ -102,21 +119,24 @@ module attn #(
   logic [5:0]        kminp [KVN], vminp [KVN];
   logic [AT*64-1:0]  scm [2*REP*SR];
   logic [16:0]       t_exp2 [256];
-  logic [HD*8-1:0]   t_cos [MAXSEQ];
-  logic [HD*8-1:0]   t_sin [MAXSEQ];
+  logic [RD*8-1:0]   t_cos [MAXSEQ];
+  logic [RD*8-1:0]   t_sin [MAXSEQ];
 
   always_ff @(posedge clk) begin
-    if (tbl_we && tbl_sel == 3'd1) t_exp2[tbl_addr] <= tbl_data;
-    if (tbl_we && tbl_sel == 3'd3) t_cos[tbl_addr / (HD / 2)][(tbl_addr % (HD / 2)) * 16 +: 16] <= tbl_data[15:0];
-    if (tbl_we && tbl_sel == 3'd4) t_sin[tbl_addr / (HD / 2)][(tbl_addr % (HD / 2)) * 16 +: 16] <= tbl_data[15:0];
+    if (tbl_we && tbl_sel == 4'd1) t_exp2[tbl_addr] <= tbl_data[16:0];
+    if (tbl_we && tbl_sel == 4'd3) t_cos[tbl_addr / (RD / 2)][(tbl_addr % (RD / 2)) * 16 +: 16] <= tbl_data[15:0];
+    if (tbl_we && tbl_sel == 4'd4) t_sin[tbl_addr / (RD / 2)][(tbl_addr % (RD / 2)) * 16 +: 16] <= tbl_data[15:0];
   end
 
-  logic [HD*8-1:0] crow, srow;
+  logic [RD*8-1:0] crow, srow;
   always_ff @(posedge clk) if (tok_start) begin crow <= t_cos[pos]; srow <= t_sin[pos]; end
 
-  logic        k1_v, k2_v, k3_v;
-  logic [31:0] k1_row, k2_row, k3_row;
-  logic [VK-1:0] k1_m, k2_m, k3_m;
+  logic        k0_v, k1_v, k2_v, k3_v;
+  logic [31:0] k0_row, k1_row, k2_row, k3_row;
+  logic [VK-1:0] k0_m, k1_m, k2_m, k3_m;
+  v48          k0_x [VW];
+  logic signed [15:0] k0_c [VW/2], k0_s [VW/2];
+  logic        k0_rot [VW];
   logic signed [63:0] k1_ac [VW/2], k1_bs [VW/2], k1_as [VW/2], k1_bc [VW/2];
   v48          k1_raw [VW];
   logic        k1_rot [VW];
@@ -131,27 +151,35 @@ module attn #(
   logic [47:0] mxh [NQ];
 
   always_ff @(posedge clk or negedge rst_n)
-    if (!rst_n) {k1_v, k2_v, k3_v} <= '0;
-    else begin k1_v <= q_we; k2_v <= k1_v; k3_v <= k2_v; end
+    if (!rst_n) {k0_v, k1_v, k2_v, k3_v} <= '0;
+    else begin k0_v <= q_we; k1_v <= k0_v; k2_v <= k1_v; k3_v <= k2_v; end
 
   always_ff @(posedge clk) begin
     if (q_we) begin
-      k1_row <= q_row; k1_m <= q_mask;
+      k0_row <= q_row; k0_m <= q_mask;
       for (int p = 0; p < VW / 2; p++) begin
         int e, k;
-        logic signed [15:0] c, s;
         e = int'(q_row) * VW + 2 * p;
-        k = (e % HD) / 2;
-        c = crow[k*16 +: 16];
-        s = srow[k*16 +: 16];
-        k1_ac[p] <= q_data[2*p] * c;
-        k1_bs[p] <= q_data[2*p+1] * s;
-        k1_as[p] <= q_data[2*p] * s;
-        k1_bc[p] <= q_data[2*p+1] * c;
+        k = ((e % HD) / 2) % (RD / 2);
+        k0_c[p] <= crow[k*16 +: 16];
+        k0_s[p] <= srow[k*16 +: 16];
       end
       for (int u = 0; u < VW; u++) begin
-        k1_raw[u] <= q_data[u];
-        k1_rot[u] <= (int'(q_row) * VW + u) / HD < NH + NKV;
+        k0_x[u] <= q_data[u];
+        k0_rot[u] <= (int'(q_row) * VW + u) / HD < NH + NKV && (int'(q_row) * VW + u) % HD < RD;
+      end
+    end
+    if (k0_v) begin
+      k1_row <= k0_row; k1_m <= k0_m;
+      for (int p = 0; p < VW / 2; p++) begin
+        k1_ac[p] <= k0_x[2*p] * k0_c[p];
+        k1_bs[p] <= k0_x[2*p+1] * k0_s[p];
+        k1_as[p] <= k0_x[2*p] * k0_s[p];
+        k1_bc[p] <= k0_x[2*p+1] * k0_c[p];
+      end
+      for (int u = 0; u < VW; u++) begin
+        k1_raw[u] <= k0_x[u];
+        k1_rot[u] <= k0_rot[u];
       end
     end
     if (k1_v) begin
@@ -197,30 +225,32 @@ module attn #(
           if (qr % QR == 0 || mx_seg[s] > mxh[h]) mxh[h] <= mx_seg[s];
         end
   logic rx_busy;
-  assign rx_busy = q_we | k1_v | k2_v | k3_v | (|kq_dl);
+  assign rx_busy = q_we | k0_v | k1_v | k2_v | k3_v | (|kq_dl);
 
-  typedef enum logic [2:0] {F_IDLE, F_META, F_SHA, F_SHB, F_QUANT, F_SCORE, F_DONE} fstate_t;
+  typedef enum logic [2:0] {F_IDLE, F_META, F_SEL, F_SHA, F_SHB, F_QUANT, F_SCORE, F_DONE} fstate_t;
   fstate_t fst;
   logic        active;
   int          lay, ntok, fcnt, fr, ft;
   logic [30:0] lf;
   logic [31:0] obase;
   int          s0q [REP], s0k, s0v, kqs, vqs, kpd, vpd;
+  logic [47:0] mq [REP], mk, mv;
   int          qshv [2][REP], kminb [2], vminb [2];
   logic signed [63:0] amax [2][REP];
   logic [HD*8-1:0] qq [REP];
   logic [5:0]  kminp_q, vminp_q;
   logic [QW*48-1:0] qrd [REP], krd, vrd;
-  logic        fq_v;
-  int          fq_r;
+  logic        fq_v, fq2_v;
+  int          fq_r, fq2_r;
+  logic signed [49:0] hk [QW], hv [QW], hq [REP][QW];
   logic        sh_we, kv_we;
   int          shb_kq, shb_vq, shb_km, shb_vm;
   logic [HD*8-1:0] kst, vst;
 
   assign sh_we = active && fst == F_SHB;
   always_comb begin
-    shb_kq = sh_b(mxh[NH + fcnt], s0k);
-    shb_vq = sh_b(mxh[NH + NKV + fcnt], s0v);
+    shb_kq = sh_b(mk, s0k);
+    shb_vq = sh_b(mv, s0v);
     shb_km = (ntok == 1 || kpd > shb_kq) ? shb_kq : kpd;
     shb_vm = (ntok == 1 || vpd > shb_vq) ? shb_vq : vpd;
   end
@@ -298,7 +328,7 @@ module attn #(
         logic [AT*64-1:0] row;
         for (int u = 0; u < AT; u++) begin
           logic signed [63:0] a;
-          a = 64'($signed(dot[j*AT+u])) <<< (int'(td_ksh[LD-1][u]) - kminb[fb]);
+          a = 64'($signed(dot[j*AT+u])) <<< (7'(td_ksh[LD-1][u]) - 7'(kminb[fb]));
           ta_a[j][u] <= (t + u < ntok) ? a : {1'b1, 63'd0};
           row[u*64 +: 64] = a;
         end
@@ -331,7 +361,14 @@ module attn #(
   logic signed [95:0] oacc [2][REP][HD];
 
   logic [AT*64-1:0] scr [REP];
-  logic        p1_v, p2_v, p3_v, p4_v, p5_v, p6_v;
+  logic        p1_v, p2_v, p3_v, p4_v, p4b_v, p4c_v, p5_v, p6_v;
+  int          p4b_t, p4c_t;
+  logic signed [7:0] p4_n [REP], p4b_n [REP];
+  logic [96:0] p4_rc [REP];
+  logic [96:0] p4b_x [REP][AT];
+  logic        p4c_big [REP][AT];
+  logic [4:0]  p4c_ip [REP][AT];
+  logic [7:0]  p4c_lo [REP][AT];
   int          p1_t, p2_t, p3_t, p4_t, p5_t, p6_t;
   logic [63:0] p2_z [REP][AT];
   logic [79:0] p3_lo [REP][AT];
@@ -354,22 +391,29 @@ module attn #(
 
   always_ff @(posedge clk or negedge rst_n)
     if (!rst_n) kv_we <= 1'b0;
-    else kv_we <= fq_v && fq_r == QR - 1;
+    else kv_we <= fq2_v && fq2_r == QR - 1;
 
-  always_ff @(posedge clk)
-    if (fq_v) begin
+  always_ff @(posedge clk) begin
+    if (fq_v)
+      for (int u = 0; u < QW; u++) begin
+        hk[u] <= h50(v48'(krd[u*48 +: 48]), kqs);
+        hv[u] <= h50(v48'(vrd[u*48 +: 48]), vqs);
+        for (int j = 0; j < REP; j++) hq[j][u] <= h50(v48'(qrd[j][u*48 +: 48]), qshv[fcnt & 1][j]);
+      end
+    if (fq2_v) begin
       logic [QW*8-1:0] kp, vp, qp;
       for (int u = 0; u < QW; u++) begin
-        kp[u*8 +: 8] = q8(v48'(krd[u*48 +: 48]), kqs);
-        vp[u*8 +: 8] = q8(v48'(vrd[u*48 +: 48]), vqs);
+        kp[u*8 +: 8] = sat8(hk[u]);
+        vp[u*8 +: 8] = sat8(hv[u]);
       end
       kst <= (HD*8)'({kp, kst} >> (QW*8));
       vst <= (HD*8)'({vp, vst} >> (QW*8));
       for (int j = 0; j < REP; j++) begin
-        for (int u = 0; u < QW; u++) qp[u*8 +: 8] = q8(v48'(qrd[j][u*48 +: 48]), qshv[fcnt & 1][j]);
+        for (int u = 0; u < QW; u++) qp[u*8 +: 8] = sat8(hq[j][u]);
         qq[j] <= (HD*8)'({qp, qq[j]} >> (QW*8));
       end
     end
+  end
 
   for (genvar u = 0; u < AT; u++) begin : g_kv
     logic [HD*8-1:0] kmem [KB];
@@ -403,13 +447,15 @@ module attn #(
   end
 
   always_ff @(posedge clk or negedge rst_n)
-    if (!rst_n) {p1_v, p2_v, p3_v, p4_v, p5_v, p6_v} <= '0;
+    if (!rst_n) {p1_v, p2_v, p3_v, p4_v, p4b_v, p4c_v, p5_v, p6_v} <= '0;
     else begin
       p1_v <= b_issue;
       p2_v <= p1_v;
       p3_v <= p2_v;
       p4_v <= p3_v;
-      p5_v <= p4_v;
+      p4b_v <= p4_v;
+      p4c_v <= p4b_v;
+      p5_v <= p4c_v;
       p6_v <= p5_v;
     end
 
@@ -430,35 +476,51 @@ module attn #(
     end
     if (p3_v) begin
       p4_t <= p3_t;
+      for (int j = 0; j < REP; j++) begin
+        int n;
+        n = 54 - qshv[bb][j] - kminb[bb];
+        p4_n[j] <= (n > 100) ? 8'sd100 : (n < -100) ? -8'sd100 : 8'(n);
+        p4_rc[j] <= (n > 0 && n < 97) ? 97'(1) << (n - 1) : 97'(0);
+      end
       for (int j = 0; j < REP; j++)
         for (int u = 0; u < AT; u++) p4_zl[j][u] <= 96'(p3_lo[j][u]) + (96'(p3_hi[j][u]) << 16);
     end
     if (p4_v) begin
-      p5_t <= p4_t;
+      p4b_t <= p4_t;
       for (int j = 0; j < REP; j++) begin
-        int n;
-        n = 54 - qshv[bb][j] - kminb[bb];
+        p4b_n[j] <= p4_n[j];
+        for (int u = 0; u < AT; u++) p4b_x[j][u] <= {1'b0, p4_zl[j][u]} + p4_rc[j];
+      end
+    end
+    if (p4b_v) begin
+      p4c_t <= p4b_t;
+      for (int j = 0; j < REP; j++)
         for (int u = 0; u < AT; u++) begin
-          logic [95:0] zl, uu;
+          logic [95:0] uu;
           logic big;
-          zl = p4_zl[j][u];
-          if (n <= 0) begin
+          if (p4b_n[j] <= 0) begin
             logic [127:0] w;
-            w = 128'(zl) << (-n);
-            big = (-n >= 32) ? (zl != 0) : (w >= 128'(17 * 256));
+            w = 128'(p4b_x[j][u][95:0]) << (-p4b_n[j]);
+            big = (-p4b_n[j] >= 32) ? (p4b_x[j][u][95:0] != 0) : (w >= 128'(17 * 256));
             uu = 96'(w);
           end
           else begin
-            logic [96:0] t;
-            t = {1'b0, zl} + (97'(1) << (n - 1));
-            uu = 96'(t >> n);
+            uu = 96'(p4b_x[j][u] >> p4b_n[j]);
             big = uu >= 96'(17 * 256);
           end
-          p5_zero[j][u] <= big || (p4_t + u >= ntok);
-          p5_ip[j][u] <= 5'(uu >> 8);
-          e2q[j][u] <= t_exp2[uu[7:0]];
+          p4c_big[j][u] <= big;
+          p4c_ip[j][u] <= 5'(uu >> 8);
+          p4c_lo[j][u] <= uu[7:0];
         end
-      end
+    end
+    if (p4c_v) begin
+      p5_t <= p4c_t;
+      for (int j = 0; j < REP; j++)
+        for (int u = 0; u < AT; u++) begin
+          p5_zero[j][u] <= p4c_big[j][u] || (p4c_t + u >= ntok);
+          p5_ip[j][u] <= p4c_ip[j][u];
+          e2q[j][u] <= t_exp2[p4c_lo[j][u]];
+        end
     end
     if (p5_v) begin
       p6_t <= p5_t;
@@ -483,7 +545,7 @@ module attn #(
         for (int u = 0; u < AT; u++) begin
           pin[j][u] <= PSW'(p6_p[j][u]);
           for (int e = 0; e < HD; e++)
-            sv[j*HD+e][u] <= 96'($signed({1'b0, p6_p[j][u]}) * $signed(vrow[u][e*8 +: 8])) <<< (int'(vshr[u]) - vminb[bb]);
+            sv[j*HD+e][u] <= 96'($signed({1'b0, p6_p[j][u]}) * $signed(vrow[u][e*8 +: 8])) <<< (7'(vshr[u]) - 7'(vminb[bb]));
         end
   mreduce #(.M(REP), .N(AT), .W(PSW), .OP(0)) u_ps (.clk, .iv(p7_v), .din(pin), .ov(ps_ov), .dout(psc));
   mreduce #(.M(REP*HD), .N(AT), .W(96), .OP(0)) u_vs (.clk, .iv(p7_v), .din(sv), .ov(vs_ov), .dout(vsum));
@@ -492,31 +554,61 @@ module attn #(
     if (!rst_n) vd_dl <= '0;
     else vd_dl <= {vd_dl[LA-1:0], p7_v};
   logic b_inflight;
-  assign b_inflight = b_issue | p1_v | p2_v | p3_v | p4_v | p5_v | p6_v | p7_v | (|vd_dl);
+  assign b_inflight = b_issue | p1_v | p2_v | p3_v | p4_v | p4b_v | p4c_v | p5_v | p6_v | p7_v | (|vd_dl);
   logic acc_v;
   assign acc_v = (LA == 0) ? p7_v : vd_dl[LA-1];
 
-  logic        o1_v, o2_v;
-  logic [31:0] o1_row;
-  int          o1_off, o1_j;
-  logic        o1_first;
-  logic [31:0] o1_g0;
-  int          o1_vmin;
-  logic signed [112:0] o1_p [P];
-  logic signed [95:0] ochunk [P];
-  v48          odv [P];
-  logic        oclr;
+  typedef struct packed {
+    logic [31:0] row;
+    logic [31:0] off;
+    logic        first;
+    logic [31:0] g0;
+    logic signed [31:0] n;
+    logic [1:0]  b;
+    logic [7:0]  j;
+    logic [7:0]  r;
+  } omd_t;
+  logic        sa_v, sb_v, sc_v, o1_v;
+  omd_t        sa_md, sb_md, sc_md, o1_md;
+  logic signed [95:0]  sb_x [P];
+  logic [16:0]         sb_q;
+  logic [127:0]        sb_rc, sc_rc;
+  logic [64:0]         sc_lo [P];
+  logic signed [65:0]  sc_hi [P];
+  logic signed [127:0] o1_p [P];
+  logic        oclr, o_busy;
 
-  assign oclr = active && ost == O_OUT && oj >= REP && !o1_v;
-  always_comb
-    for (int u = 0; u < P; u++) begin
-      ochunk[u] = '0;
-      odv[u] = rnd(128'(o1_p[u]), 32 - o1_vmin);
-      for (int b = 0; b < 2; b++)
-        for (int j = 0; j < REP; j++)
-          for (int r = 0; r < HD / P; r++)
-            if (ob == b && oj == j && orr == r) ochunk[u] = oacc[b][j][r * P + u];
+  assign o_busy = sa_v | sb_v | sc_v | o1_v;
+  assign oclr = active && ost == O_OUT && oj >= REP && !o_busy;
+
+  always_ff @(posedge clk) begin
+    if (sa_v) begin
+      sb_md <= sa_md;
+      sb_q <= quo[sa_md.j];
+      sb_rc <= (sa_md.n > 0 && sa_md.n < 120) ? 128'(1) << (sa_md.n - 1) : '0;
+      for (int u = 0; u < P; u++) begin
+        logic signed [95:0] x;
+        x = '0;
+        for (int b = 0; b < 2; b++)
+          for (int j = 0; j < REP; j++)
+            for (int r = 0; r < HD / P; r++)
+              if (sa_md.b == 2'(b) && sa_md.j == 8'(j) && sa_md.r == 8'(r)) x = oacc[b][j][r * P + u];
+        sb_x[u] <= x;
+      end
     end
+    if (sb_v) begin
+      sc_md <= sb_md;
+      sc_rc <= sb_rc;
+      for (int u = 0; u < P; u++) begin
+        sc_lo[u] <= 65'(sb_x[u][47:0] * sb_q);
+        sc_hi[u] <= 66'($signed(sb_x[u][95:48]) * $signed({1'b0, sb_q}));
+      end
+    end
+    if (sc_v) begin
+      o1_md <= sc_md;
+      for (int u = 0; u < P; u++) o1_p[u] <= (128'(sc_hi[u]) <<< 48) + 128'(sc_lo[u]) + sc_rc;
+    end
+  end
 
   always_ff @(posedge clk)
     for (int b = 0; b < 2; b++)
@@ -531,24 +623,30 @@ module attn #(
 
   always_ff @(posedge clk)
     if (o1_v) begin
-      o_row <= o1_row;
-      o_first <= o1_first;
-      o_g0 <= o1_g0;
-      for (int k = 0; k < VK; k++) o_mask[k] <= (k * G >= o1_off) && (k * G < o1_off + P);
+      o_row <= o1_md.row;
+      o_first <= o1_md.first;
+      o_g0 <= o1_md.g0;
+      for (int k = 0; k < VK; k++) o_mask[k] <= (k * G >= int'(o1_md.off)) && (k * G < int'(o1_md.off) + P);
       for (int k = 0; k < VW / P; k++)
-        if (o1_off == k * P)
-          for (int u = 0; u < P; u++) o_data[k * P + u] <= odv[u];
+        if (int'(o1_md.off) == k * P)
+          for (int u = 0; u < P; u++)
+            o_data[k * P + u] <= (o1_md.n <= 0) ? 48'(o1_p[u] <<< (-o1_md.n)) : (o1_md.n >= 120) ? '0 : 48'(o1_p[u] >>> o1_md.n);
     end
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       fst <= F_IDLE; ost <= O_IDLE; prun <= 1'b0; active <= 1'b0; done <= 1'b0; fcnt <= 0; pcnt <= 0; ocnt <= 0;
-      t1_v <= 1'b0; fq_v <= 1'b0; o1_v <= 1'b0; o_we <= 1'b0;
+      t1_v <= 1'b0; fq_v <= 1'b0; fq2_v <= 1'b0; sa_v <= 1'b0; sb_v <= 1'b0; sc_v <= 1'b0; o1_v <= 1'b0; o_we <= 1'b0;
     end else begin
       done <= 1'b0;
       t1_v <= 1'b0;
       fq_v <= 1'b0;
-      o1_v <= 1'b0;
+      fq2_v <= fq_v;
+      fq2_r <= fq_r;
+      sa_v <= 1'b0;
+      sb_v <= sa_v;
+      sc_v <= sb_v;
+      o1_v <= sc_v;
       o_we <= 1'b0;
       if (go) begin
         active <= 1'b1;
@@ -566,11 +664,17 @@ module attn #(
 
       if (active) case (fst)
         F_IDLE: if (!rx_busy && fcnt < NKV && fcnt <= pcnt + 1) fst <= F_META;
-        F_META: fst <= F_SHA;
+        F_META: fst <= F_SEL;
+        F_SEL: begin
+          for (int j = 0; j < REP; j++) mq[j] <= mxh[fcnt * REP + j];
+          mk <= mxh[NH + fcnt];
+          mv <= mxh[NH + NKV + fcnt];
+          fst <= F_SHA;
+        end
         F_SHA: begin
-          for (int j = 0; j < REP; j++) s0q[j] <= sh_a(mxh[fcnt * REP + j]);
-          s0k <= sh_a(mxh[NH + fcnt]);
-          s0v <= sh_a(mxh[NH + NKV + fcnt]);
+          for (int j = 0; j < REP; j++) s0q[j] <= sh_a(mq[j]);
+          s0k <= sh_a(mk);
+          s0v <= sh_a(mv);
           kpd <= int'(kminp_q);
           vpd <= int'(vminp_q);
           fst <= F_SHB;
@@ -578,7 +682,7 @@ module attn #(
         F_SHB: begin
           int fb;
           fb = fcnt & 1;
-          for (int j = 0; j < REP; j++) qshv[fb][j] <= sh_b(mxh[fcnt * REP + j], s0q[j]);
+          for (int j = 0; j < REP; j++) qshv[fb][j] <= sh_b(mq[j], s0q[j]);
           kqs <= shb_kq; vqs <= shb_vq;
           kminb[fb] <= shb_km; vminb[fb] <= shb_vm;
           fr <= 0;
@@ -586,7 +690,7 @@ module attn #(
         end
         F_QUANT: begin
           if (fr < QR) begin fq_v <= 1'b1; fq_r <= fr; fr <= fr + 1; end
-          else if (!fq_v) begin ft <= 0; fst <= F_SCORE; end
+          else if (!fq_v && !fq2_v) begin ft <= 0; fst <= F_SCORE; end
         end
         F_SCORE: begin
           if (ft < ntok) begin t1_v <= 1'b1; t1_t <= ft; ft <= ft + AT; end
@@ -624,31 +728,32 @@ module attn #(
             logic [PSW:0] r;
             logic [16:0] q;
             r = rem[j]; q = quo[j];
-            for (int k = 0; k < 4; k++)
+            for (int k = 0; k < 2; k++)
               if (dbit - k >= 0) begin
                 if ({r[PSW-1:0], 1'b0} >= {1'b0, psum[ob][j]}) begin r = {r[PSW-1:0], 1'b0} - {1'b0, psum[ob][j]}; q[dbit - k] = 1'b1; end
                 else r = {r[PSW-1:0], 1'b0};
               end
             rem[j] <= r; quo[j] <= q;
           end
-          dbit <= dbit - 4;
-          if (dbit < 4) begin oj <= 0; orr <= 0; ost <= O_OUT; end
+          dbit <= dbit - 2;
+          if (dbit < 2) begin oj <= 0; orr <= 0; ost <= O_OUT; end
         end
         O_OUT: begin
           if (oj < REP) begin
             int idx0;
             idx0 = (ocnt * REP + oj) * HD + orr * P;
-            o1_v <= 1'b1;
-            o1_row <= obase / VW + 32'(idx0 / VW);
-            o1_off <= idx0 % VW;
-            o1_j <= oj;
-            o1_first <= (ocnt == 0 && oj == 0 && orr == 0);
-            o1_g0 <= 32'((idx0 - idx0 % VW) / G);
-            o1_vmin <= cvmin[ob];
-            for (int u = 0; u < P; u++) o1_p[u] <= 113'(ochunk[u] * $signed({1'b0, quo[oj]}));
+            sa_v <= 1'b1;
+            sa_md.row <= obase / VW + 32'(idx0 / VW);
+            sa_md.off <= 32'(idx0 % VW);
+            sa_md.first <= (ocnt == 0 && oj == 0 && orr == 0);
+            sa_md.g0 <= 32'((idx0 - idx0 % VW) / G);
+            sa_md.n <= 32 - cvmin[ob];
+            sa_md.b <= 2'(ob);
+            sa_md.j <= 8'(oj);
+            sa_md.r <= 8'(orr);
             if (orr + 1 < HD / P) orr <= orr + 1;
             else begin orr <= 0; oj <= oj + 1; end
-          end else if (!o1_v) begin
+          end else if (!o_busy) begin
             ocnt <= ocnt + 1;
             if (ocnt + 1 >= NKV) begin active <= 1'b0; done <= 1'b1; end
             ost <= O_IDLE;

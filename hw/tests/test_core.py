@@ -9,9 +9,10 @@ from hw.compiler import compile_model
 from hw.ref import load
 
 WBITS = int(os.environ.get("WBITS", "4"))
+HBITS = int(os.environ.get("HBITS", WBITS))
 LANES = int(os.environ.get("LANES", "8"))
-MODEL, META = load(WBITS)
-IMG = compile_model(MODEL, LANES, WBITS)
+MODEL, META = load(WBITS, os.environ.get("MODEL", "tiny"), hbits=HBITS, lora=int(os.environ.get("LORA", "0")))
+IMG = compile_model(MODEL, LANES)
 
 
 async def write_all(dut, we, fields, rows):
@@ -26,7 +27,7 @@ async def write_all(dut, we, fields, rows):
 async def setup(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     dut.rst_n.value = 0
-    for name in ("imem_we", "emb_we", "w_we", "tbl_we", "start", "tok_in", "pos_in", "perf_sel", "vm_raddr"):
+    for name in ("imem_we", "emb_we", "w_we", "s_we", "tbl_we", "start", "tok_in", "pos_in", "perf_sel", "vm_raddr"):
         getattr(dut, name).value = 0
     await ClockCycles(dut.clk, 3)
     dut.rst_n.value = 1
@@ -35,6 +36,7 @@ async def setup(dut):
     await write_all(dut, "emb_we", ("emb_addr", "emb_data"), IMG.emb)
     await write_all(dut, "tbl_we", ("tbl_sel", "tbl_addr", "tbl_data"), IMG.tables)
     await write_all(dut, "w_we", ("w_lane", "w_addr", "w_data"), IMG.banks)
+    await write_all(dut, "s_we", ("s_lane", "s_addr", "s_data"), IMG.scales)
     await RisingEdge(dut.clk)
 
 

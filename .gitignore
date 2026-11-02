@@ -5,3 +5,4 @@ hw/tests/results.xml
 *.fst
 *.vcd
 data/
+.DS_Store

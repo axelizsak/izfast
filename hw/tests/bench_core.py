@@ -6,9 +6,10 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, ReadOnly, RisingEdge, Timer
 
-from hw.compiler import OPS, Shape, compile_shape
+from hw.compiler import OPS, QShape, Shape, compile_shape
 
-SHAPE = Shape(**json.loads(os.environ["SHAPE"]))
+_S = json.loads(os.environ["SHAPE"])
+SHAPE = (QShape if _S.get("_q") else Shape)(**{k: tuple(v) if k == "kinds" else v for k, v in _S.items() if k != "_q"})
 LANES = int(os.environ["LANES"])
 CTX = [int(c) for c in os.environ["CTX"].split(",")]
 OUT = Path(os.environ["OUT"])
@@ -18,7 +19,7 @@ OUT = Path(os.environ["OUT"])
 async def bench(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     dut.rst_n.value = 0
-    for name in ("imem_we", "emb_we", "w_we", "tbl_we", "start", "tok_in", "pos_in", "perf_sel"):
+    for name in ("imem_we", "emb_we", "w_we", "s_we", "tbl_we", "start", "tok_in", "pos_in", "perf_sel"):
         getattr(dut, name).value = 0
     await ClockCycles(dut.clk, 3)
     dut.rst_n.value = 1

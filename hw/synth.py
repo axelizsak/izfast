@@ -72,9 +72,9 @@ def buffer_fanout(src, dst, top, buf, fanout=12):
     return count
 
 
-def run(top, lib, params):
+def run(top, lib, params, tag="", activity=0.5, paths=1):
     L = LIBS[lib]
-    out = HW / "build" / "synth" / f"{top}_{lib}"
+    out = HW / "build" / "synth" / f"{top}_{lib}{'_' + tag if tag else ''}"
     out.mkdir(parents=True, exist_ok=True)
     libs = [str(EDA / "pdk" / f) for f in L["files"]]
     dont = " ".join(f"-dont_use {c}" for c in L["dont_use"])
@@ -91,7 +91,7 @@ def run(top, lib, params):
     (out / "syn.ys").write_text(
         f"{rl}read_json {out / 'cut.json'}\nsynth -top {top} -booth -noalumacc -noabc -extra-map +/choices/kogge-stone.v\n"
         f"dfflibmap -liberty {libs[L['seq']]} {dont}\nabc -D {L['period'] * L['scale']:.0f} -constr {out / 'abc.constr'} -script {ABC} {al} {dont}\n"
-        f"opt_clean -purge\nsetundef -zero\nhilomap -singleton {L['tie']}\nopt_clean -purge\n"
+        f"opt_clean{' -purge' if paths == 1 else ''}\nsetundef -zero\nhilomap -singleton {L['tie']}\nopt_clean{' -purge' if paths == 1 else ''}\n"
         f"tee -o {out / 'stat.txt'} stat {al}\nwrite_json {out / 'mapped.json'}\n")
     subprocess.run(["yosys", "-q", "-s", str(out / "syn.ys")], check=True)
     nbuf = buffer_fanout(out / "mapped.json", out / "buffered.json", top, L["buf"])
@@ -101,12 +101,20 @@ def run(top, lib, params):
         "suppress_msg 1212\n" + "".join(f"read_liberty {f}\n" for f in libs)
         + f"read_verilog {out / 'net.v'}\nlink_design {top}\ncreate_clock -name clk -period {L['period']} [get_ports clk]\n"
         "set_input_delay 0 -clock clk [all_inputs -no_clocks]\nset_output_delay 0 -clock clk [all_outputs]\n"
-        "report_checks -path_delay max -digits 3\nset ws [worst_slack -max]\n"
-        f"puts [format \"FMAX_MHZ %.1f\" [expr {{1.0e-6 / [sta::time_ui_sta [expr {{{L['period']} - $ws}}]]}}]]\n")
+        + (f"report_checks -path_delay max -digits 3\n" if paths == 1 else f"report_checks -path_delay max -digits 3 -group_path_count {paths} -endpoint_path_count 1 -fields {{net}}\n")
+        + "set ws [worst_slack -max]\n"
+        f"puts [format \"FMAX_MHZ %.1f\" [expr {{1.0e-6 / [sta::time_ui_sta [expr {{{L['period']} - $ws}}]]}}]]\n"
+        f"set_power_activity -input -activity {activity}\nreport_power -digits 6\n")
     r = subprocess.run([str(EDA / "bin" / "sta"), "-no_splash", "-no_init", "-exit", str(out / "sta.tcl")],
                        capture_output=True, text=True, check=True)
     (out / "sta.txt").write_text(r.stdout)
     print(f"{nbuf} fanout buffers inserted")
+    pw = re.search(r"^Total\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)", r.stdout, re.M)
+    if pw:
+        dyn, leak = float(pw.group(1)) + float(pw.group(2)), float(pw.group(3))
+        period = L["period"] * (1e-12 if L["scale"] == 1 else 1e-9)
+        print(f"power at {1e-6 / period:.0f} MHz, input activity {activity}: dynamic {dyn * 1e3:.3f} mW, leakage {leak * 1e3:.4f} mW, "
+              f"dynamic energy {dyn * period * 1e12:.2f} pJ per cycle")
     return float(re.search(r"FMAX_MHZ ([\d.]+)", r.stdout).group(1)), out
 
 
@@ -115,6 +123,9 @@ if __name__ == "__main__":
     p.add_argument("top")
     p.add_argument("--lib", choices=LIBS, default="sky130hd")
     p.add_argument("--param", nargs="*", default=[])
+    p.add_argument("--tag", default="")
+    p.add_argument("--activity", type=float, default=0.5)
+    p.add_argument("--paths", type=int, default=1)
     a = p.parse_args()
-    fmax, out = run(a.top, a.lib, dict(kv.split("=") for kv in a.param))
+    fmax, out = run(a.top, a.lib, dict(kv.split("=") for kv in a.param), a.tag, a.activity, a.paths)
     print(f"{a.top} {a.lib}: fmax {fmax:.1f} MHz, report in {out / 'sta.txt'}")

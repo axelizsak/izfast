@@ -1,0 +1,160 @@
+{
+ "cycles": {
+  "qwen3.5-4b/l1024": {
+   "att_tok": 4,
+   "heads_parallel": 8,
+   "lanes": 1024,
+   "max_seq": 1024,
+   "model": "qwen3.5-4b",
+   "per_ctx": {
+    "0": 184602,
+    "1023": 194754,
+    "511": 189634
+   },
+   "vk": 4
+  }
+ },
+ "fpga": {
+  "tc2_l16_v1_a4_h1": {
+   "config": {
+    "att_tok": 4,
+    "heads_parallel": 1,
+    "lanes": 16,
+    "max_seq": 256,
+    "model": "TC2 shape",
+    "vk": 1
+   },
+   "dsps": 6310,
+   "ffs": 316851,
+   "fit": {
+    "AMD Kria KV260 (K26)": {
+     "dsps": 5.056089743589744,
+     "luts": 6.013592896174863,
+     "memory": 2.2522276422764227
+    },
+    "AMD VCU118 (VU9P)": {
+     "dsps": 0.922514619883041,
+     "luts": 0.5957436730274732,
+     "memory": 0.15014850948509484
+    },
+    "AMD ZCU104 (ZU7EV)": {
+     "dsps": 3.6516203703703702,
+     "luts": 3.056909722222222,
+     "memory": 1.3680197530864198
+    },
+    "AWS EC2 F2 (VU47P)": {
+     "dsps": 0.6992464539007093,
+     "luts": 0.5401165644171779,
+     "memory": 0.15237843784378438
+    }
+   },
+   "luts": 704312,
+   "mbit": 53.188608,
+   "memory": {
+    "embedding": 8.912896,
+    "kv": 1.048576,
+    "state": 3.588096,
+    "weights": 39.63904
+   }
+  }
+ },
+ "quality": {
+  "eval_qwen_w4h8": {
+   "chip_w4h8": {
+    "perplexity": 6.666193542207625,
+    "same_next_token": 0.8938356164383562
+   },
+   "model": "qwen3.5-4b",
+   "reference": {
+    "perplexity": 6.3857014694952055
+   },
+   "tokens": 2044
+  },
+  "eval_tc1_w2h8": {
+   "chip_w2h8": {
+    "perplexity": 5.275853100089964,
+    "same_next_token": 0.9879901960784314
+   },
+   "model": "tc1",
+   "reference": {
+    "perplexity": 5.281931400299072
+   },
+   "tokens": 4080,
+   "validation_loss_training": 1.649
+  }
+ },
+ "rtl_checks": {
+  "qwen3.5-4b_w4h8_l128": {
+   "answer": "The capital of France",
+   "att_tok": 4,
+   "cycles_per_token": 1082639,
+   "date": "2026-11-01",
+   "lanes": 128,
+   "positions": 22,
+   "positions_bit_exact": 22,
+   "tokens_equal": true,
+   "vk": 4
+  },
+  "tc1_w2h8_l64": {
+   "answer": ", there was a little girl named Lily. She loved to play with her toys",
+   "att_tok": 4,
+   "cycles_per_token": 6122,
+   "date": "2026-11-01",
+   "lanes": 64,
+   "positions": 19,
+   "positions_bit_exact": 19,
+   "tokens_equal": true,
+   "vk": 1
+  }
+ },
+ "synthesis": {
+  "attn_asap7_vk1_bitnet": {
+   "area_um2": 1090116.681823,
+   "fmax_mhz": 937.4,
+   "power_w_at_lib_period": {
+    "dynamic": 5.418386,
+    "leakage": 0.001163238
+   }
+  },
+  "attn_asap7_vk1_tc1": {
+   "area_um2": 371498.108401,
+   "fmax_mhz": 1023.9,
+   "power_w_at_lib_period": {
+    "dynamic": 1.8152053000000001,
+    "leakage": 0.0004040583
+   }
+  },
+  "dnu_asap7_vk1": {
+   "area_um2": 364122.85914,
+   "fmax_mhz": 699.8,
+   "power_w_at_lib_period": {
+    "dynamic": 1.3730352,
+    "leakage": 0.0003849874
+   }
+  },
+  "mvu_asap7_w4h8_l4": {
+   "area_um2": 16657.12512,
+   "fmax_mhz": 1040.0,
+   "power_w_at_lib_period": {
+    "dynamic": 0.10993458,
+    "leakage": 1.557543e-05
+   }
+  },
+  "mvu_asap7_w4h8_l8": {
+   "area_um2": 31448.19978,
+   "fmax_mhz": 1035.1,
+   "power_w_at_lib_period": {
+    "dynamic": 0.20197944,
+    "leakage": 2.907394e-05
+   }
+  },
+  "vpu_asap7_vk1": {
+   "area_um2": 324014.00814,
+   "fmax_mhz": 637.3,
+   "power_w_at_lib_period": {
+    "dynamic": 0.7339123,
+    "leakage": 0.0003909389
+   }
+  }
+ }
+}

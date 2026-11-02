@@ -42,7 +42,7 @@ async def token(dut, tok, pos):
 async def serve(dut):
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     dut.rst_n.value = 0
-    for name in ("imem_we", "emb_we", "w_we", "tbl_we", "start", "tok_in", "pos_in", "perf_sel", "vm_raddr"):
+    for name in ("imem_we", "emb_we", "w_we", "s_we", "tbl_we", "start", "tok_in", "pos_in", "perf_sel", "vm_raddr"):
         getattr(dut, name).value = 0
     await ClockCycles(dut.clk, 3)
     dut.rst_n.value = 1
